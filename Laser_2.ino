@@ -1,24 +1,42 @@
+
+#include <Servo.h>
+Servo myServo;
+
+#define SERVO_SPEED 900
+#define MAXDISTANCE 600
+#define STARTANGLE 40
+
+// always mm
+float dartWidth = 8;
+
+float laserDistance = 383;
+
+int distanceToCenter = 0;
+
+int angle = STARTANGLE;
+int factor = 1;
+
+int alpha = 0;
+int beta = 0;
+int gamma = 0;
+
+int measurementCount = 0;
+int totalDistance = 0;
+int totalAngle = 0;
+int totalDartDistance = 0;
+
+const float pi = 3.14159265359;
+
 boolean recdata = true;
 boolean data;
 int buf[64];
 int rc=0;
 
-#include <Servo.h>
-Servo myServo;
-
-#define SERVO_SPEED 1000
-
-int angle = 25;
-int factor = 1;
-
-
-void setup()
-{
-Serial.begin(115200);
-Serial1.begin(115200);
-    myServo.attach(13);
-    myServo.write(angle);
-//Serial.println("Start...");
+void setup() {
+  Serial.begin(115200);
+  Serial1.begin(115200);
+  myServo.attach(13);
+  myServo.write(STARTANGLE);
 }
 
 void loop()
@@ -83,8 +101,6 @@ for(int p = 0; p<rc; p++){
       if(countdata==8)dist+=data*100;//" |="" 
       if(countdata==9)dist+=data;//------------------------------------------|" 
       if(countdata==10)src=data;//here" extract="" the="" checksum="" of="" the="" package="" 
-      Serial.print(data); 
-      Serial.print("=");
       data=0;
       }
       buf[p]=0; 
@@ -101,10 +117,56 @@ if(sum==src){// If the amount of bits (except the last) is the checksum (last di
 // Serial.print(sum);
 // Serial.print(" ");
 // Serial.print(src);
-Serial.print("\t");
-Serial.print(countLaser); //Output data of the internal counter
-Serial.print("\t");
-Serial.print(dist);//Output the distance and ... 
+if (dist < MAXDISTANCE && dist > 0) {
+  
+  int tempAngle = angle;
+  measurementCount++;
+  totalAngle+=tempAngle;
+  totalDistance+=dist;
+  Serial.print(tempAngle);
+  Serial.print(" & ");
+  Serial.print(dist);//Output the distance and ... ¨
+
+  Serial.print(" || total: ");
+  Serial.print(totalAngle);
+  Serial.print(" & ");
+  Serial.print(totalDistance);
+  Serial.print(" & ");
+  
+  int angleAverage = totalAngle/measurementCount;
+  int distanceAverage = totalDistance/measurementCount;
+  Serial.print("average: ");
+  Serial.print(angleAverage);
+  Serial.print(" & ");
+  Serial.print(distanceAverage);
+
+  int dartAngle = abs(angleAverage - STARTANGLE);
+  
+  int dartDistance = getDistanceFromMiddleToDart(dartAngle*(pi/180), dist); //Dart distance to middlepoint
+  
+  totalDartDistance += dartDistance; //sin(dartAngle*(pi/180))*laserDistance;
+  
+  beta = getAngleFromMiddlePoint(dartAngle*(pi/180), dist, dartDistance);
+
+  int dartDistanceAverage = totalDartDistance / measurementCount; 
+
+  Serial.print(" & dartDistance: ");
+  Serial.print(dartDistance);
+  Serial.print(" & avgDartDistance: ");
+  Serial.print(dartDistanceAverage);
+  Serial.print(" & beta: ");
+  Serial.print(beta);
+  Serial.print(" & gamma: ");
+  Serial.print(gamma);
+  Serial.println();
+}
+
+
+//if(measurementCount == 10) {
+
+  //Serial1.write("r"); //give the command to start a new cycle
+//}
+
 if(countLaser==99){// if the counter has reached the limit, then ... 
 Serial1.write("*004545#"); //give the command to start a new cycle 
 }
@@ -114,17 +176,23 @@ countdata = 0;
 countLaser = 0;
 rc=0;
 recdata = false;
-Serial.println();
 }
 }
 }
 
-void moveServo() {
-   myServo.write(angle);
 
-   if (angle >= 50 || angle <= 0) {
+void moveServo() { 
+   if (angle < 11 || angle > 69) {
     factor *= -1;
     }
     angle += factor;  
+    myServo.write(angle);
 }
 
+int getDistanceFromMiddleToDart(int alpha, int dist) {
+    return sqrt(pow(laserDistance,2) + pow(dist,2)-(2*laserDistance*dist)*cos(alpha));
+  }
+
+int getAngleFromMiddlePoint(int alpha, int dist, int dartDist) {
+    return acos((pow(laserDistance,2) - pow(dist,2) - pow(dartDist,2))/(-2*dartDist*laserDistance));
+  }
