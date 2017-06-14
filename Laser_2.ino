@@ -3,27 +3,26 @@
 Servo myServo;
 
 #define SERVO_SPEED 900
-#define MAXDISTANCE 600
+#define MAXDISTANCE 600 //mm
 #define STARTANGLE 40
 
 // always mm
 float dartWidth = 8;
 
-float laserDistance = 383;
+float laserDistanceToCenter = 422; //mm
 
-int distanceToCenter = 0;
-
-int angle = STARTANGLE;
+float angle = STARTANGLE;
 int factor = 1;
 
-int alpha = 0;
-int beta = 0;
-int gamma = 0;
+float alpha = 0;
+float beta = 0;
+float gamma = 0;
 
-int measurementCount = 0;
-int totalDistance = 0;
-int totalAngle = 0;
-int totalDartDistance = 0;
+float measurementCount = 0;
+float totalDistance = 0;
+float totalAngle = 0;
+float totalDartDistanceToCenter = 0;
+float totalDartAngleToCenter = 0;
 
 const float pi = 3.14159265359;
 
@@ -36,7 +35,7 @@ void setup() {
   Serial.begin(115200);
   Serial1.begin(115200);
   myServo.attach(13);
-  myServo.write(STARTANGLE);
+  myServo.write(angle);
 }
 
 void loop()
@@ -45,17 +44,17 @@ void loop()
  
  // check time since last servo position update 
  if ((millis()-servo_time) >= SERVO_SPEED) {
-   servo_time = millis(); // save time reference for next position update
+   servo_time = millis();
    moveServo();
  }
 
 static unsigned long t = 0;
-if (millis() > (t + 2000)){ // timer start when no data from the sensor 
+if (millis() > (t + 2000)){
 Serial1.write("*004545#");
 t = millis();
 }
 getdist();
-if (recdata) t = millis(); // Reset the timer when it receives data from the sensor 
+if (recdata) t = millis();
 }
 
 int getdist(){
@@ -64,112 +63,104 @@ int litera;
 if (Serial1.available() > 0){
 while (Serial1.available() > 0){
 litera = Serial1.read();
-if (litera == 42) { // If adopted a "*" 
-data = true; //Then set the sign of the beginning of the packet 
+if (litera == 42) { 
+data = true; 
 }
 
-if (litera == 35) { // If adopted, the "#" 
-data = false; //Then set the sign of the end of the package ... 
-recdata = true; //And install a sign to obtain data for the control (reset) the timer and further processing of the packet 
+if (litera == 35) { 
+data = false;
+recdata = true;  
 }
-if(data==true && rc<40 && litera>47){ // If there is a sign of the beginning of the packet, the packet length is reasonable and litera has a numeric value to ASCII, the ... 
-litera = litera-48;// convert ASCII to figure ... 
-buf[rc] = litera; // And add it to the array. 
+if(data==true && rc<40 && litera>47){  
+litera = litera-48;
+buf[rc] = litera; 
 rc++;
 }
 }
 
 }else{
 if (recdata == true){
-boolean dig=true; //This variable will work to separate the package into categories 2 digits 
-int countdata=0; //This variable will be considered level 
-int data=0; //This variable will take the values ​​of bits 
-int sum=0; //This sum of all digits except for the last 
-int src=0; //This is the last category (10), which defines the checksum 
-int countLaser=0; //This is an internal counter in the 5th digit 
-int dist=0; //It is the distance, we calculate 
+boolean dig=true;
+int countdata=0;  
+int data=0; 
+int sum=0; 
+int src=0; 
+int countLaser=0; 
+int dist=0; 
 for(int p = 0; p<rc; p++){
   if(dig){
-    data=buf[p]*10;//Here" we="" have="" the="" first="" sign="" of="" any="" new="" discharge="" multiply="" by="" 10="" ....="" 
+    data=buf[p]*10;
     countdata++;
     }
     else{
-      data+=buf[p];// and="" here="" we="" add="" to="" it,="" the="" second="" value.="" 
-      if(countdata<10)sum+=data; //here" podschitvaem="" checksum="" 
-      if(countdata==5)countLaser=data; //here" to="" see="" the="" counter="" 
-      if(countdata==7)dist=data*10000; //" here="" believe="" distantsiyayu="" ---------|="" 
-      if(countdata==8)dist+=data*100;//" |="" 
-      if(countdata==9)dist+=data;//------------------------------------------|" 
-      if(countdata==10)src=data;//here" extract="" the="" checksum="" of="" the="" package="" 
+      data+=buf[p];
+      if(countdata<10)sum+=data;  
+      if(countdata==5)countLaser=data; 
+      if(countdata==7)dist=data*10000; 
+      if(countdata==8)dist+=data*100;
+      if(countdata==9)dist+=data; 
+      if(countdata==10)src=data;
       data=0;
       }
       buf[p]=0; 
       dig=!dig;
       }
-      if(sum>= 100) {// If the checksum is greater than 99, then cut off the excess, leaving only the last two 
+      if(sum>= 100) {
         int a=sum;
         sum=sum/100;
         sum=sum*100;
         sum =a-sum;
     }
 if(sum==src){// If the amount of bits (except the last) is the checksum (last digit) then ... 
-// Serial.print(" ");
-// Serial.print(sum);
-// Serial.print(" ");
-// Serial.print(src);
+
 if (dist < MAXDISTANCE && dist > 0) {
   
-  int tempAngle = angle;
+  float tempAngle = angle;
   measurementCount++;
   totalAngle+=tempAngle;
   totalDistance+=dist;
+  
   Serial.print(tempAngle);
   Serial.print(" & ");
-  Serial.print(dist);//Output the distance and ... ¨
+  Serial.print(dist);
 
-  Serial.print(" || total: ");
+  Serial.print(" || total angle: ");
   Serial.print(totalAngle);
-  Serial.print(" & ");
+  Serial.print(" & total distance ");
   Serial.print(totalDistance);
-  Serial.print(" & ");
   
-  int angleAverage = totalAngle/measurementCount;
-  int distanceAverage = totalDistance/measurementCount;
-  Serial.print("average: ");
+  float angleAverage = totalAngle/measurementCount;
+  float distanceAverage = totalDistance/measurementCount;
+  Serial.print(" & average angle: ");
   Serial.print(angleAverage);
-  Serial.print(" & ");
+  Serial.print(" & averageDistance: ");
   Serial.print(distanceAverage);
 
-  int dartAngle = abs(angleAverage - STARTANGLE);
+  float dartAngleLaser = abs(angleAverage - STARTANGLE);
   
-  int dartDistance = getDistanceFromMiddleToDart(dartAngle*(pi/180), dist); //Dart distance to middlepoint
+  float dartDistance = getDistanceFromMiddleToDart(dartAngleLaser*(pi/180), distanceAverage); //Dart distance to middlepoint
+  Serial.print(" & dartangleLaser: ");
+  Serial.print(dartAngleLaser);
+  totalDartDistanceToCenter += dartDistance;
   
-  totalDartDistance += dartDistance; //sin(dartAngle*(pi/180))*laserDistance;
+  beta = getAngleFromMiddlePoint(dartAngleLaser*(pi/180), dartDistance, distanceAverage);
   
-  beta = getAngleFromMiddlePoint(dartAngle*(pi/180), dist, dartDistance);
+  totalDartAngleToCenter += beta;
+  
+  float dartDistanceAverage = totalDartDistanceToCenter / measurementCount; 
+  float dartAngleAverage = totalDartAngleToCenter / measurementCount;
 
-  int dartDistanceAverage = totalDartDistance / measurementCount; 
-
-  Serial.print(" & dartDistance: ");
-  Serial.print(dartDistance);
-  Serial.print(" & avgDartDistance: ");
+  Serial.print(" & avgDartDistance from center [mm]: ");
   Serial.print(dartDistanceAverage);
-  Serial.print(" & beta: ");
-  Serial.print(beta);
-  Serial.print(" & gamma: ");
-  Serial.print(gamma);
+  Serial.print(" & avgDartAngle to centerline: ");
+  Serial.print(dartAngleAverage);
   Serial.println();
+  delay(1000);
 }
 
-
-//if(measurementCount == 10) {
-
-  //Serial1.write("r"); //give the command to start a new cycle
-//}
-
-if(countLaser==99){// if the counter has reached the limit, then ... 
-Serial1.write("*004545#"); //give the command to start a new cycle 
-}
+  if(countLaser==99){
+    Serial1.write("*004545#");
+  }
 }
 src = 0;
 countdata = 0;
@@ -182,17 +173,21 @@ recdata = false;
 
 
 void moveServo() { 
-   if (angle < 11 || angle > 69) {
-    factor *= -1;
-    }
-    angle += factor;  
+    angle += 1;
     myServo.write(angle);
+    if (angle > 60) {
+      myServo.write(STARTANGLE);
+      angle = STARTANGLE;
+    }
+    
 }
 
-int getDistanceFromMiddleToDart(int alpha, int dist) {
-    return sqrt(pow(laserDistance,2) + pow(dist,2)-(2*laserDistance*dist)*cos(alpha));
+float getDistanceFromMiddleToDart(float alfa, float b ) {
+
+      return sqrt((pow(b,2) + pow(laserDistanceToCenter,2) - 2*b*laserDistanceToCenter * cos(alfa)));
   }
 
-int getAngleFromMiddlePoint(int alpha, int dist, int dartDist) {
-    return acos((pow(laserDistance,2) - pow(dist,2) - pow(dartDist,2))/(-2*dartDist*laserDistance));
+float getAngleFromMiddlePoint(float alfa, float a, float b) {
+    return asin(b*sin(alfa) / a) * (180 / pi);
   }
+
